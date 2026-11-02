@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Nythorion (Auth + API)",
+    "Projects": [
+      {
+        "Path": "src\\Nythorion.Auth\\Nythorion.Auth.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Nythorion.Api\\Nythorion.Api.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

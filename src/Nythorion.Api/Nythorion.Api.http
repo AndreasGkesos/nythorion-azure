@@ -1,0 +1,83 @@
+@ApiHost = https://localhost:7185
+@AuthHost = https://localhost:7087
+
+### Get token
+# @name tokenRequest
+POST {{AuthHost}}/connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id=nythorion-web&client_secret=nythorion-web-secret&scope=api
+
+###
+
+@token = {{tokenRequest.response.body.access_token}}
+
+### List documents
+GET {{ApiHost}}/documents
+Authorization: Bearer {{token}}
+
+###
+
+### Upload document
+POST {{ApiHost}}/documents/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="test.pdf"
+Content-Type: application/pdf
+
+< C:\Users\asdf\files\file.pdf
+--boundary--
+
+###
+
+@documentId = YOUR_DOCUMENT_ID_HERE
+
+### Semantic search
+GET {{ApiHost}}/search?q=what is microservices
+Authorization: Bearer {{token}}
+
+###
+
+### Get summary
+GET {{ApiHost}}/documents/{{documentId}}/summary
+Authorization: Bearer {{token}}
+
+###
+
+### Get flashcards
+GET {{ApiHost}}/documents/{{documentId}}/flashcards
+Authorization: Bearer {{token}}
+
+###
+
+### Generate one more flashcard
+POST {{ApiHost}}/documents/{{documentId}}/flashcards/generate
+Authorization: Bearer {{token}}
+
+###
+
+### Delete a flashcard
+@flashcardId = YOUR_FLASHCARD_ID_HERE
+DELETE {{ApiHost}}/documents/{{documentId}}/flashcards/{{flashcardId}}
+Authorization: Bearer {{token}}
+
+###
+
+### Get quiz questions
+GET {{ApiHost}}/documents/{{documentId}}/quiz
+Authorization: Bearer {{token}}
+
+###
+
+### Generate one more quiz question
+POST {{ApiHost}}/documents/{{documentId}}/quiz/generate
+Authorization: Bearer {{token}}
+
+###
+
+### Delete a quiz question
+@questionId = YOUR_QUESTION_ID_HERE
+DELETE {{ApiHost}}/documents/{{documentId}}/quiz/{{questionId}}
+Authorization: Bearer {{token}}
