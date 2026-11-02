@@ -34,23 +34,6 @@ public sealed class AuthSeeder(IServiceProvider services, IConfiguration configu
     {
         var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
 
-        // Machine-to-machine client (kept for dev tooling)
-        if (await manager.FindByClientIdAsync("nythorion-web", ct) is null)
-        {
-            await manager.CreateAsync(new OpenIddictApplicationDescriptor
-            {
-                ClientId = "nythorion-web",
-                ClientSecret = "nythorion-web-secret",
-                DisplayName = "Nythorion Web",
-                Permissions =
-                {
-                    OpenIddictConstants.Permissions.Endpoints.Token,
-                    OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
-                    OpenIddictConstants.Permissions.Prefixes.Scope + "api"
-                }
-            }, ct);
-        }
-
         // Browser client — Authorization Code + PKCE, no secret
         var spaDescriptor = new OpenIddictApplicationDescriptor
         {

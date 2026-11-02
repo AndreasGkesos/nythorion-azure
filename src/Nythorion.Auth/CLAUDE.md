@@ -28,8 +28,7 @@ dotnet dotnet-ef database update --project src/Nythorion.Auth
 
 ## Token endpoint
 - `/connect/token` — issues access tokens
-- Currently supports client credentials flow (machine-to-machine)
-- User login flow (authorization code + PKCE) will be added with the Angular UI
+- Supports only authorization code + PKCE (the Angular SPA). The client-credentials flow and its client were removed in the Azure fork because the secret would be public.
 
 ## Connection string
 - Key: `ConnectionStrings:Default`

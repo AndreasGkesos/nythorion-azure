@@ -40,7 +40,6 @@ public static class AuthServerExtensions
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetTokenEndpointUris("/connect/token");
 
-                options.AllowClientCredentialsFlow();
                 options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
 
                 options.RegisterScopes(

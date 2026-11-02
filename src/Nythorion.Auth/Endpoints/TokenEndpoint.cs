@@ -15,22 +15,6 @@ public static class TokenEndpoint
         var request = transaction?.Request
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-        if (request.IsClientCredentialsGrantType())
-        {
-            var identity = new ClaimsIdentity(
-                authenticationType: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                nameType: OpenIddictConstants.Claims.Name,
-                roleType: OpenIddictConstants.Claims.Role);
-
-            identity.AddClaim(OpenIddictConstants.Claims.Subject, request.ClientId!);
-
-            var principal = new ClaimsPrincipal(identity);
-            principal.SetScopes(request.GetScopes());
-            principal.SetResources(AuthConstants.ApiResource);
-
-            return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
-
         if (request.IsAuthorizationCodeGrantType())
         {
             var result = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

@@ -1,16 +1,8 @@
 @ApiHost = https://localhost:7185
 @AuthHost = https://localhost:7087
 
-### Get token
-# @name tokenRequest
-POST {{AuthHost}}/connect/token
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=client_credentials&client_id=nythorion-web&client_secret=nythorion-web-secret&scope=api
-
-###
-
-@token = {{tokenRequest.response.body.access_token}}
+### Token: log in through the SPA and copy the access token here
+@token = PASTE_ACCESS_TOKEN_HERE
 
 ### List documents
 GET {{ApiHost}}/documents
