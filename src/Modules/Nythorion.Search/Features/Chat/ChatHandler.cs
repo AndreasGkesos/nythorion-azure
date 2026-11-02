@@ -35,7 +35,7 @@ internal sealed class ChatHandler(ISearchDbContext db, OllamaEmbeddingClient emb
         var queryEmbedding = await embeddingClient.GetEmbeddingAsync(searchQuery, cancellationToken);
         var queryVector = new Vector(queryEmbedding);
 
-        var query = db.DocumentChunks.Where(c => c.Embedding != null);
+        var query = db.DocumentChunks.Where(c => c.Embedding != null && c.Document.UserId == request.UserId);
 
         if (request.DocumentId.HasValue)
             query = query.Where(c => c.DocumentId == request.DocumentId.Value);

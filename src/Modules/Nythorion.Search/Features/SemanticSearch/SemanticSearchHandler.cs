@@ -15,7 +15,7 @@ internal sealed class SemanticSearchHandler(ISearchDbContext db, OllamaEmbedding
         var queryEmbedding = await ollamaClient.GetEmbeddingAsync(request.Text, cancellationToken);
         var queryVector = new Vector(queryEmbedding);
 
-        var query = db.DocumentChunks.Where(c => c.Embedding != null);
+        var query = db.DocumentChunks.Where(c => c.Embedding != null && c.Document.UserId == request.UserId);
 
         if (request.DocumentId.HasValue)
             query = query.Where(c => c.DocumentId == request.DocumentId.Value);

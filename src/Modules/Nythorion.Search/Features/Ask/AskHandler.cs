@@ -18,7 +18,7 @@ internal sealed class AskHandler(ISearchDbContext db, OllamaEmbeddingClient embe
         var queryEmbedding = await embeddingClient.GetEmbeddingAsync(request.Question, cancellationToken);
         var queryVector = new Vector(queryEmbedding);
 
-        var query = db.DocumentChunks.Where(c => c.Embedding != null);
+        var query = db.DocumentChunks.Where(c => c.Embedding != null && c.Document.UserId == request.UserId);
 
         if (request.DocumentId.HasValue)
             query = query.Where(c => c.DocumentId == request.DocumentId.Value);
