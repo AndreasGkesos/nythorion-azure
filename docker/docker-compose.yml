@@ -17,5 +17,37 @@ services:
       timeout: 5s
       retries: 5
 
+  # Containerised apps for checking the images locally: docker compose --profile apps up --build
+  auth:
+    profiles: [apps]
+    build:
+      context: ..
+      dockerfile: src/Nythorion.Auth/Dockerfile
+    environment:
+      ConnectionStrings__Default: Host=postgres;Database=nythorion_auth;Username=nythorion;Password=nythorion
+      Spa__BaseUrl: http://localhost:4200
+      Registration__Enabled: "false"
+      SeedUsers__0__Username: compose-user
+      SeedUsers__0__Password: compose-password
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: [apps]
+    build:
+      context: ..
+      dockerfile: src/Nythorion.Api/Dockerfile
+    environment:
+      ConnectionStrings__Default: Host=postgres;Database=nythorion;Username=nythorion;Password=nythorion
+      Auth__Issuer: http://auth:8080
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:

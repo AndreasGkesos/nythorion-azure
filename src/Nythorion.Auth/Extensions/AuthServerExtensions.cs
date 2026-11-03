@@ -72,6 +72,8 @@ public static class AuthServerExtensions
         services.AddAuthorization();
         services.Configure<RegistrationOptions>(configuration.GetSection(RegistrationOptions.SectionName));
         services.AddRazorPages();
+        // Order matters: hosted services start one after another, so the schema exists before seeding
+        services.AddHostedService<DatabaseMigrator>();
         services.AddHostedService<AuthSeeder>();
 
         return services;
