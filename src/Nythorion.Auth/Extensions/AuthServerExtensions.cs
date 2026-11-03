@@ -70,6 +70,7 @@ public static class AuthServerExtensions
             options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
         });
         services.AddAuthorization();
+        services.Configure<RegistrationOptions>(configuration.GetSection(RegistrationOptions.SectionName));
         services.AddRazorPages();
         services.AddHostedService<AuthSeeder>();
 

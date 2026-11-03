@@ -2,11 +2,12 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using Nythorion.Auth.Data;
 
 namespace Nythorion.Auth.Pages.Connect;
 
-public sealed class LoginModel(SignInManager<AppUser> signInManager) : PageModel
+public sealed class LoginModel(SignInManager<AppUser> signInManager, IOptions<RegistrationOptions> registration) : PageModel
 {
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -15,6 +16,8 @@ public sealed class LoginModel(SignInManager<AppUser> signInManager) : PageModel
     public string? ReturnUrl { get; set; }
 
     public string? ErrorMessage { get; private set; }
+
+    public bool RegistrationEnabled => registration.Value.Enabled;
 
     public void OnGet(string? returnUrl)
     {

@@ -8,8 +8,10 @@
   "ConnectionStrings": {
     "Default": "Host=localhost;Port=5432;Database=nythorion_auth;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
   },
-  "AdminUser": {
-    "Username": "admin",
-    "Password": "change-me"
-  }
+  "Registration": {
+    "Enabled": true
+  },
+  "SeedUsers": [
+    { "Username": "admin", "Password": "change-me" }
+  ]
 }

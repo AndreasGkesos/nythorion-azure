@@ -90,10 +90,12 @@ Then open the file and set a password for the admin account you will use to log 
   "ConnectionStrings": {
     "Default": "Host=localhost;Port=5432;Database=nythorion_auth;Username=nythorion;Password=nythorion"
   },
-  "AdminUser": {
-    "Username": "admin",
-    "Password": "your-password-here"
-  }
+  "Registration": {
+    "Enabled": true
+  },
+  "SeedUsers": [
+    { "Username": "admin", "Password": "your-password-here" }
+  ]
 }
 ```
 

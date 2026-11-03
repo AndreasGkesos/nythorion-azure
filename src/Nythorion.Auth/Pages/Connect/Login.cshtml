@@ -39,9 +39,12 @@
             <input type="password" asp-for="Input.Password" autocomplete="current-password" />
             <button type="submit">Sign in</button>
         </form>
+        @if (Model.RegistrationEnabled)
+        {
         <p style="text-align:center;font-size:.875rem;color:#555;margin-top:1rem">
             No account? <a href="/Connect/Register?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "")" style="color:#1976d2;text-decoration:none">Create one</a>
         </p>
+        }
     </div>
 </body>
 </html>

@@ -4,7 +4,7 @@ using OpenIddict.Abstractions;
 
 namespace Nythorion.Auth;
 
-public sealed class AuthSeeder(IServiceProvider services, IConfiguration configuration) : IHostedService
+public sealed class AuthSeeder(IServiceProvider services, IConfiguration configuration, ILogger<AuthSeeder> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -13,7 +13,7 @@ public sealed class AuthSeeder(IServiceProvider services, IConfiguration configu
 
         await SeedScopesAsync(sp, cancellationToken);
         await SeedClientsAsync(sp, cancellationToken);
-        await SeedAdminUserAsync(sp, cancellationToken);
+        await SeedUsersAsync(sp, cancellationToken);
     }
 
     private static async Task SeedScopesAsync(IServiceProvider sp, CancellationToken ct)
@@ -30,8 +30,11 @@ public sealed class AuthSeeder(IServiceProvider services, IConfiguration configu
         }
     }
 
-    private static async Task SeedClientsAsync(IServiceProvider sp, CancellationToken ct)
+    private async Task SeedClientsAsync(IServiceProvider sp, CancellationToken ct)
     {
+        var spaBaseUrl = configuration["Spa:BaseUrl"]?.TrimEnd('/')
+            ?? throw new InvalidOperationException("Spa:BaseUrl must be set in configuration.");
+
         var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
 
         // Browser client — Authorization Code + PKCE, no secret
@@ -40,8 +43,8 @@ public sealed class AuthSeeder(IServiceProvider services, IConfiguration configu
             ClientId = "nythorion-spa",
             ClientType = OpenIddictConstants.ClientTypes.Public,
             DisplayName = "Nythorion SPA",
-            RedirectUris = { new Uri("http://localhost:4200/callback") },
-            PostLogoutRedirectUris = { new Uri("http://localhost:4200") },
+            RedirectUris = { new Uri($"{spaBaseUrl}/callback") },
+            PostLogoutRedirectUris = { new Uri(spaBaseUrl) },
             Permissions =
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -62,20 +65,27 @@ public sealed class AuthSeeder(IServiceProvider services, IConfiguration configu
             await manager.UpdateAsync(spaClient, spaDescriptor, ct);
     }
 
-    private async Task SeedAdminUserAsync(IServiceProvider sp, CancellationToken ct)
+    private async Task SeedUsersAsync(IServiceProvider sp, CancellationToken ct)
     {
+        var seedUsers = configuration.GetSection("SeedUsers").Get<List<SeedUser>>() ?? [];
+        if (seedUsers.Count == 0)
+            logger.LogWarning("No SeedUsers configured; only self-registration can create users");
+
         var userManager = sp.GetRequiredService<UserManager<AppUser>>();
 
-        var username = configuration["AdminUser:Username"];
-        var password = configuration["AdminUser:Password"];
-
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-            throw new InvalidOperationException("AdminUser:Username and AdminUser:Password must be set in configuration.");
-
-        if (await userManager.FindByNameAsync(username) is null)
+        foreach (var seedUser in seedUsers)
         {
-            var user = new AppUser { UserName = username, Email = $"{username}@nythorion.local" };
-            await userManager.CreateAsync(user, password);
+            if (string.IsNullOrWhiteSpace(seedUser.Username) || string.IsNullOrWhiteSpace(seedUser.Password))
+                throw new InvalidOperationException("Every SeedUsers entry needs a Username and a Password.");
+
+            if (await userManager.FindByNameAsync(seedUser.Username) is not null)
+                continue;
+
+            var user = new AppUser { UserName = seedUser.Username, Email = $"{seedUser.Username}@nythorion.local" };
+            var result = await userManager.CreateAsync(user, seedUser.Password);
+            if (!result.Succeeded)
+                throw new InvalidOperationException(
+                    $"Seeding user '{seedUser.Username}' failed: {string.Join("; ", result.Errors.Select(e => e.Description))}");
         }
     }
 

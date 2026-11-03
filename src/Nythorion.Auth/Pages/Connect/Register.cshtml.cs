@@ -2,11 +2,15 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using Nythorion.Auth.Data;
 
 namespace Nythorion.Auth.Pages.Connect;
 
-public sealed class RegisterModel(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager) : PageModel
+public sealed class RegisterModel(
+    UserManager<AppUser> userManager,
+    SignInManager<AppUser> signInManager,
+    IOptions<RegistrationOptions> registration) : PageModel
 {
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -16,13 +20,20 @@ public sealed class RegisterModel(UserManager<AppUser> userManager, SignInManage
 
     public List<string> Errors { get; private set; } = [];
 
-    public void OnGet(string? returnUrl)
+    public IActionResult OnGet(string? returnUrl)
     {
+        if (!registration.Value.Enabled)
+            return NotFound();
+
         ReturnUrl = returnUrl;
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
+        if (!registration.Value.Enabled)
+            return NotFound();
+
         if (!ModelState.IsValid)
         {
             Errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
