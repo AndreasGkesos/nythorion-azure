@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Nythorion.Api.Extensions;
 using Nythorion.Documents;
 using Nythorion.Embeddings;
@@ -7,6 +8,14 @@ using Nythorion.Search;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    // The container sits behind the Container Apps ingress, whose IPs are not fixed
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+builder.Services.AddHealthChecks();
 builder.Services.AddDatabase(builder.Configuration);
 builder.Services.AddAuth(builder.Configuration);
 builder.Services.AddProcessing();
@@ -35,11 +44,15 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
-app.UseHttpsRedirection();
+app.UseForwardedHeaders();
+
+if (app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
 app.MapDocumentEndpoints();
 app.MapSearchEndpoints();
 app.MapLearningEndpoints();
