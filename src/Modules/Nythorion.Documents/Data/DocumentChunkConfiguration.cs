@@ -6,8 +6,8 @@ namespace Nythorion.Documents.Data;
 
 public class DocumentChunkConfiguration : IEntityTypeConfiguration<DocumentChunk>
 {
-    // Dimension of the nomic-embed-text embedding model
-    private const int EmbeddingDimension = 768;
+    // Dimension of the text-embedding-3-small embedding model
+    private const int EmbeddingDimension = 1536;
 
     public void Configure(EntityTypeBuilder<DocumentChunk> builder)
     {

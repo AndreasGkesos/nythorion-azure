@@ -32,6 +32,10 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Settings that normally come from the gitignored appsettings.Development.json
+        builder.UseSetting("Auth:Issuer", "https://localhost");
+        builder.UseSetting("ConnectionStrings:Default", _postgres.GetConnectionString());
+
         builder.ConfigureServices(services =>
         {
             // Replace the real DbContext with one pointing at the test container

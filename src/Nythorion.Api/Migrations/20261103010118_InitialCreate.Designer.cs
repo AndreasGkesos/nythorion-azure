@@ -13,15 +13,15 @@ using Pgvector;
 namespace Nythorion.Api.Migrations
 {
     [DbContext(typeof(NythorionDbContext))]
-    [Migration("20260511074428_AddUserIdToDocuments")]
-    partial class AddUserIdToDocuments
+    [Migration("20261103010118_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.15")
+                .HasAnnotation("ProductVersion", "9.0.22")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
@@ -37,6 +37,11 @@ namespace Nythorion.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("FileName")
                         .IsRequired()
@@ -59,7 +64,7 @@ namespace Nythorion.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Documents", (string)null);
+                    b.ToTable("documents", (string)null);
                 });
 
             modelBuilder.Entity("Nythorion.Documents.Domain.DocumentChunk", b =>
@@ -79,13 +84,13 @@ namespace Nythorion.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Vector>("Embedding")
-                        .HasColumnType("vector(768)");
+                        .HasColumnType("vector(1536)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("DocumentId");
 
-                    b.ToTable("DocumentChunks", (string)null);
+                    b.ToTable("document_chunks", (string)null);
                 });
 
             modelBuilder.Entity("Nythorion.Learning.Domain.Flashcard", b =>
@@ -111,6 +116,30 @@ namespace Nythorion.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("flashcards", (string)null);
+                });
+
+            modelBuilder.Entity("Nythorion.Learning.Domain.Note", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("notes", (string)null);
                 });
 
             modelBuilder.Entity("Nythorion.Learning.Domain.QuizQuestion", b =>
