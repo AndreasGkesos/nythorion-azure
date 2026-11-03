@@ -21,6 +21,9 @@ public static class DatabaseExtensions
         services.AddScoped<ISearchDbContext>(sp => sp.GetRequiredService<NythorionDbContext>());
         services.AddScoped<ILearningDbContext>(sp => sp.GetRequiredService<NythorionDbContext>());
 
+        // Registered before the processing worker so migrations finish first (hosted services start in order)
+        services.AddHostedService<DatabaseMigrator>();
+
         return services;
     }
 }
