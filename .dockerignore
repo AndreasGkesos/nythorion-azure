@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.vs/
+**/.angular/
+.git/
+.github/
+.claude/
+tests/
+docker/
+src/Nythorion.Web/
+**/appsettings.Development.json
+**/*.user
+CODEBASE.md
+memory/
