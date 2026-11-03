@@ -1,17 +1,18 @@
 import { inject, Injectable } from '@angular/core';
 import { OAuthService } from 'angular-oauth2-oidc';
-import { environment } from '../../../environments/environment';
+import { RuntimeConfigService } from './runtime-config.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly oauthService = inject(OAuthService);
+  private readonly runtimeConfig = inject(RuntimeConfigService);
 
   configure(): void {
     this.oauthService.configure({
-      issuer: environment.authUrl,
+      issuer: this.runtimeConfig.authUrl,
       redirectUri: window.location.origin + '/callback',
-      clientId: environment.clientId,
-      scope: environment.scope,
+      clientId: this.runtimeConfig.clientId,
+      scope: this.runtimeConfig.scope,
       responseType: 'code',
       postLogoutRedirectUri: window.location.origin,
       requireHttps: false,

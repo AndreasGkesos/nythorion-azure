@@ -6,9 +6,11 @@ import { provideOAuthClient } from 'angular-oauth2-oidc';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { AuthService } from './core/services/auth.service';
+import { RuntimeConfigService } from './core/services/runtime-config.service';
 
-function initAuth(auth: AuthService) {
+function initApp(runtimeConfig: RuntimeConfigService, auth: AuthService) {
   return async () => {
+    await runtimeConfig.load();
     auth.configure();
     await auth.init();
   };
@@ -23,8 +25,8 @@ export const appConfig: ApplicationConfig = {
     provideOAuthClient(),
     {
       provide: APP_INITIALIZER,
-      useFactory: initAuth,
-      deps: [AuthService],
+      useFactory: initApp,
+      deps: [RuntimeConfigService, AuthService],
       multi: true
     }
   ]

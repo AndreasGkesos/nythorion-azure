@@ -1,12 +1,12 @@
 import { HttpHandlerFn, HttpInterceptorFn, HttpRequest, HttpStatusCode } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { tap } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { AuthService } from '../services/auth.service';
+import { RuntimeConfigService } from '../services/runtime-config.service';
 import { NotificationService } from '../../shared/services/notification.service';
 
 export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
-  if (!req.url.startsWith(environment.apiUrl)) {
+  if (!req.url.startsWith(inject(RuntimeConfigService).apiUrl)) {
     return next(req);
   }
 

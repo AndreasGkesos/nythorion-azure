@@ -1,13 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../../../environments/environment';
+import { RuntimeConfigService } from '../../../core/services/runtime-config.service';
 import { AskResult, ChatMessage, ChatResult, Document, Flashcard, Note, QuizQuestion, SearchResult, Summary, UploadResult } from '../models/document.models';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentService {
   private readonly http = inject(HttpClient);
-  private readonly base = environment.apiUrl;
+  private readonly base = inject(RuntimeConfigService).apiUrl;
 
   getDocuments(): Observable<Document[]> {
     return this.http.get<Document[]>(`${this.base}/documents`);
