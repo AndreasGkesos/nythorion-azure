@@ -25,6 +25,7 @@ services:
       dockerfile: src/Nythorion.Auth/Dockerfile
     environment:
       ConnectionStrings__Default: Host=postgres;Database=nythorion_auth;Username=nythorion;Password=nythorion
+      Auth__Issuer: https://auth.example.test
       Spa__BaseUrl: http://localhost:4200
       Registration__Enabled: "false"
       SeedUsers__0__Username: compose-user

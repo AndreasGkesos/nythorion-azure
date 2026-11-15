@@ -6,7 +6,9 @@ namespace Nythorion.Auth.Extensions;
 
 public static class AuthServerExtensions
 {
-    public static IServiceCollection AddAuthServer(this IServiceCollection services, IConfiguration configuration)
+    private const string IssuerKey = "Auth:Issuer";
+
+    public static IServiceCollection AddAuthServer(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         services.AddDbContext<AuthDbContext>(options =>
         {
@@ -47,9 +49,24 @@ public static class AuthServerExtensions
                     OpenIddict.Abstractions.OpenIddictConstants.Scopes.Profile,
                     "api");
 
-                options.AddDevelopmentEncryptionCertificate()
-                       .AddDevelopmentSigningCertificate()
-                       .DisableAccessTokenEncryption();
+                if (environment.IsDevelopment())
+                {
+                    options.AddDevelopmentEncryptionCertificate()
+                           .AddDevelopmentSigningCertificate();
+                }
+                else
+                {
+                    // In memory and regenerated on restart: users sign in again, nothing to store or rotate
+                    options.AddEphemeralEncryptionKey()
+                           .AddEphemeralSigningKey();
+                }
+
+                options.DisableAccessTokenEncryption();
+
+                // Must equal the Auth:Issuer the Api validates against, and cannot be inferred behind an ingress
+                var issuer = configuration[IssuerKey];
+                if (!string.IsNullOrWhiteSpace(issuer))
+                    options.SetIssuer(issuer);
 
                 options.UseAspNetCore()
                        .EnableTokenEndpointPassthrough()

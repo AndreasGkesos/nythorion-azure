@@ -82,6 +82,7 @@ resource auth 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             { name: 'ConnectionStrings__Default', secretRef: 'database-connection' }
+            { name: 'Auth__Issuer', value: authUrl }
             { name: 'Spa__BaseUrl', value: spaUrl }
             { name: 'Cors__AllowedOrigins__0', value: spaUrl }
             { name: 'Registration__Enabled', value: 'false' }

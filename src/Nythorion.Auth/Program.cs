@@ -4,7 +4,7 @@ using Nythorion.Auth.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddAuthServer(builder.Configuration);
+builder.Services.AddAuthServer(builder.Configuration, builder.Environment);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
