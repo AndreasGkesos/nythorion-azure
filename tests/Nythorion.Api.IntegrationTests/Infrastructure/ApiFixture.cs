@@ -4,11 +4,14 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Nythorion.Api.Data;
 using Nythorion.Api.Processing;
+using Nythorion.Documents.Domain;
+using Pgvector;
 using Testcontainers.PostgreSql;
 
 namespace Nythorion.Api.IntegrationTests.Infrastructure;
@@ -57,6 +60,12 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
                     };
                 });
 
+            // Fakes so tests never call Azure OpenAI
+            services.RemoveAll<IChatClient>();
+            services.RemoveAll<IEmbeddingGenerator<string, Embedding<float>>>();
+            services.AddSingleton<IChatClient>(new FakeChatClient());
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new FakeEmbeddingGenerator());
+
             // Remove background worker — no AI service available in tests
             services.RemoveAll<IHostedService>();
 
@@ -79,6 +88,22 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         "IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYT4+CmVuZG9iagp4cmVmCjAgNgow" +
         "MDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBu" +
         "IAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNjYgMDAwMDAgbiAKMDAwMDAwMDM2MCAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNiAvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgo0NDUKJSVFT0YK");
+
+    public async Task<Guid> SeedEmbeddedDocumentAsync(string userId, string content)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NythorionDbContext>();
+
+        var document = Document.Create(userId, content, $"{content}.pdf", "application/pdf", content.Length);
+        var chunk = DocumentChunk.Create(document.Id, 0, content);
+        chunk.Embedding = new Vector(FakeEmbeddingGenerator.Vector);
+        document.Chunks.Add(chunk);
+
+        db.Documents.Add(document);
+        await db.SaveChangesAsync();
+
+        return document.Id;
+    }
 
     public HttpClient CreateClientForUser(string userId)
     {
