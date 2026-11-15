@@ -7,6 +7,10 @@ namespace Nythorion.Api.Extensions;
 public static class AiExtensions
 {
     private const string SectionName = "AzureOpenAI";
+    private const string TemperatureKey = "Temperature";
+    private const string MaxOutputTokensKey = "MaxOutputTokens";
+    private const float DefaultTemperature = 0.1f;
+    private const int DefaultMaxOutputTokens = 4096;
 
     public static IServiceCollection AddAzureOpenAi(this IServiceCollection services, IConfiguration configuration)
     {
@@ -16,6 +20,18 @@ public static class AiExtensions
         services.AddSingleton(_ => new AzureOpenAIClient(
             new Uri(section["Endpoint"]!),
             new DefaultAzureCredential()));
+
+        services.AddSingleton<IChatClient>(sp =>
+            new ChatClientBuilder(
+                    sp.GetRequiredService<AzureOpenAIClient>()
+                        .GetChatClient(section["ChatDeployment"]!)
+                        .AsIChatClient())
+                .ConfigureOptions(options =>
+                {
+                    options.Temperature = section.GetValue(TemperatureKey, DefaultTemperature);
+                    options.MaxOutputTokens = section.GetValue(MaxOutputTokensKey, DefaultMaxOutputTokens);
+                })
+                .Build());
 
         services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
             sp.GetRequiredService<AzureOpenAIClient>()

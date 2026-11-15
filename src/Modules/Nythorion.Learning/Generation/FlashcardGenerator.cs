@@ -1,13 +1,14 @@
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Nythorion.Learning.Data;
 using Nythorion.Learning.Domain;
 
-namespace Nythorion.Learning.OllamaClient;
+namespace Nythorion.Learning.Generation;
 
-internal sealed class FlashcardGenerator(ILearningDbContext db, OllamaLlmClient llmClient, ILogger<FlashcardGenerator> logger)
+internal sealed class FlashcardGenerator(IChatClient chatClient, ILogger<FlashcardGenerator> logger)
 {
+    private static readonly ChatOptions JsonOptions = new() { ResponseFormat = ChatResponseFormat.Json };
+
     private const string SystemPrompt = """
         You are a flashcard generator. Create 1 flashcard from the provided text.
         The question must be clear and complete — someone reading it with no context should understand what is being asked.
@@ -36,10 +37,13 @@ internal sealed class FlashcardGenerator(ILearningDbContext db, OllamaLlmClient 
 
         var userPrompt = $"Generate 1 flashcard from this text. {existingList}\n\nText:\n{text}";
 
-        var json = await llmClient.GenerateAsync(SystemPrompt, userPrompt, cancellationToken);
-        logger.LogInformation("Flashcard raw response: {Response}", json);
+        var response = await chatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.System, SystemPrompt), new ChatMessage(ChatRole.User, userPrompt)],
+            JsonOptions,
+            cancellationToken);
+        logger.LogInformation("Flashcard raw response: {Response}", response.Text);
 
-        return Parse(json, documentId, existingQuestions);
+        return Parse(response.Text, documentId, existingQuestions);
     }
 
     private Flashcard? Parse(string json, Guid documentId, List<string> existingQuestions)

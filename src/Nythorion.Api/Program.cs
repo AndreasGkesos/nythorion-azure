@@ -22,16 +22,8 @@ builder.Services.AddProcessing();
 builder.Services.AddDocumentsModule();
 builder.Services.AddAzureOpenAi(builder.Configuration);
 builder.Services.AddEmbeddingsModule();
-builder.Services.AddSearchModule(
-    builder.Configuration["Ollama:BaseUrl"]!,
-    builder.Configuration["Ollama:LlmModel"]!,
-    builder.Configuration.GetValue<float>("Ollama:Temperature", 0.1f),
-    builder.Configuration.GetValue<int>("Ollama:NumPredict", 4096));
-builder.Services.AddLearningModule(
-    builder.Configuration["Ollama:BaseUrl"]!,
-    builder.Configuration["Ollama:LlmModel"]!,
-    builder.Configuration.GetValue<float>("Ollama:Temperature", 0.1f),
-    builder.Configuration.GetValue<int>("Ollama:NumPredict", 4096));
+builder.Services.AddSearchModule();
+builder.Services.AddLearningModule();
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
         policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()!)
@@ -58,10 +50,10 @@ app.MapLearningEndpoints();
 
 app.MapGet("/config", (IConfiguration config) => Results.Ok(new
 {
-    llmModel    = config["Ollama:LlmModel"],
+    llmModel    = config["AzureOpenAI:ChatDeployment"],
     embedModel  = config["AzureOpenAI:EmbeddingDeployment"],
-    temperature = config.GetValue<float>("Ollama:Temperature", 0.1f),
-    numPredict  = config.GetValue<int>("Ollama:NumPredict", 4096)
+    temperature = config.GetValue<float>("AzureOpenAI:Temperature", 0.1f),
+    numPredict  = config.GetValue<int>("AzureOpenAI:MaxOutputTokens", 4096)
 })).RequireAuthorization();
 
 app.Run();

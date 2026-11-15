@@ -57,7 +57,7 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
                     };
                 });
 
-            // Remove background worker — no Ollama available in tests
+            // Remove background worker — no AI service available in tests
             services.RemoveAll<IHostedService>();
 
             // Apply migrations

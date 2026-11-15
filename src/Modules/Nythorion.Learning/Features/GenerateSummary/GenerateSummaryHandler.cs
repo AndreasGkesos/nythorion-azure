@@ -1,12 +1,12 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Nythorion.Learning.Data;
 using Nythorion.Learning.Domain;
-using Nythorion.Learning.OllamaClient;
 
 namespace Nythorion.Learning.Features.GenerateSummary;
 
-internal sealed class GenerateSummaryHandler(ILearningDbContext db, OllamaLlmClient llmClient)
+internal sealed class GenerateSummaryHandler(ILearningDbContext db, IChatClient chatClient)
     : IRequestHandler<GenerateSummaryCommand, GenerateSummaryResult>
 {
     private const int ChunksPerBatch = 10;
@@ -59,8 +59,7 @@ internal sealed class GenerateSummaryHandler(ILearningDbContext db, OllamaLlmCli
                 {batchText}
                 """;
 
-            var result = await llmClient.GenerateAsync(systemPrompt, userPrompt, cancellationToken, jsonFormat: false);
-            results.Add(result.Trim());
+            results.Add(await CompleteAsync(systemPrompt, userPrompt, cancellationToken));
         }
 
         return results;
@@ -82,7 +81,15 @@ internal sealed class GenerateSummaryHandler(ILearningDbContext db, OllamaLlmCli
             Write a detailed plain prose summary of the full document in 8 to 12 sentences. Cover the main topics, key arguments, important concepts, and conclusions. Do not repeat yourself.
             """;
 
-        var result = await llmClient.GenerateAsync(systemPrompt, userPrompt, cancellationToken, jsonFormat: false);
-        return result.Trim();
+        return await CompleteAsync(systemPrompt, userPrompt, cancellationToken);
+    }
+
+    private async Task<string> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken)
+    {
+        var response = await chatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.System, systemPrompt), new ChatMessage(ChatRole.User, userPrompt)],
+            cancellationToken: cancellationToken);
+
+        return response.Text.Trim();
     }
 }

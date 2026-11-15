@@ -32,7 +32,7 @@ public class FlashcardEndpointTests(ApiFixture fixture) : IClassFixture<ApiFixtu
         flashcards.Should().BeEmpty();
     }
 
-    // ── Batch generate — no Ollama, just test the 400 guard ───────────────
+    // ── Batch generate — no AI service, just test the 400 guard ───────────────
 
     [Fact]
     public async Task GenerateFlashcardsBatch_WithoutToken_Returns401()

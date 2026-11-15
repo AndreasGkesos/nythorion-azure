@@ -2,13 +2,12 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Nythorion.Search.Data;
-using Nythorion.Search.OllamaClient;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 
 namespace Nythorion.Search.Features.Ask;
 
-internal sealed class AskHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, OllamaLlmClient llmClient)
+internal sealed class AskHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, IChatClient chatClient)
     : IRequestHandler<AskQuery, AskResult>
 {
     private const int TopK = 8;
@@ -50,8 +49,10 @@ internal sealed class AskHandler(ISearchDbContext db, IEmbeddingGenerator<string
             Answer in plain prose only. Do not use bullet points, numbered lists, headers, or any markdown formatting.
             """;
 
-        var answer = await llmClient.GenerateAsync(systemPrompt, userPrompt, cancellationToken);
+        var response = await chatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.System, systemPrompt), new ChatMessage(ChatRole.User, userPrompt)],
+            cancellationToken: cancellationToken);
 
-        return new AskResult(answer, sources);
+        return new AskResult(response.Text, sources);
     }
 }

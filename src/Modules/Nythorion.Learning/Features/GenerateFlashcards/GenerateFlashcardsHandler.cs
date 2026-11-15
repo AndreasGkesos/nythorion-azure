@@ -2,7 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Nythorion.Learning.Data;
-using Nythorion.Learning.OllamaClient;
+using Nythorion.Learning.Generation;
 
 namespace Nythorion.Learning.Features.GenerateFlashcards;
 

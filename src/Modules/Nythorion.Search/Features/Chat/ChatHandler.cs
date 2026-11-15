@@ -1,16 +1,14 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using Nythorion.Search.Data;
-using Nythorion.Search.OllamaClient;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
-using ChatMessage = Nythorion.Search.OllamaClient.ChatMessage;
 
 namespace Nythorion.Search.Features.Chat;
 
-internal sealed class ChatHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, OllamaLlmClient llmClient, ILogger<ChatHandler> logger)
+internal sealed class ChatHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, IChatClient chatClient, ILogger<ChatHandler> logger)
     : IRequestHandler<ChatQuery, ChatResult>
 {
     private const int TopK = 8;
@@ -55,14 +53,19 @@ internal sealed class ChatHandler(ISearchDbContext db, IEmbeddingGenerator<strin
 
         var history = request.Messages.ToList();
         var lastIndex = history.FindLastIndex(m => m.Role == "user");
-        history[lastIndex] = new ChatMessage("user", $"Document excerpts:\n{context}\n\nQuestion: {history[lastIndex].Content}");
+        history[lastIndex] = new ChatTurn("user", $"Document excerpts:\n{context}\n\nQuestion: {history[lastIndex].Content}");
 
-        var answer = await llmClient.ChatAsync(AnswerSystemPrompt, history, cancellationToken);
+        var messages = history
+            .Select(turn => new ChatMessage(new ChatRole(turn.Role), turn.Content))
+            .Prepend(new ChatMessage(ChatRole.System, AnswerSystemPrompt))
+            .ToList();
 
-        return new ChatResult(answer, sources);
+        var response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+
+        return new ChatResult(response.Text, sources);
     }
 
-    private async Task<string> RewriteQueryAsync(List<ChatMessage> messages, string lastUserMessage, CancellationToken cancellationToken)
+    private async Task<string> RewriteQueryAsync(List<ChatTurn> messages, string lastUserMessage, CancellationToken cancellationToken)
     {
         const string systemPrompt = """
             You are a search query rewriter. Given a conversation history and the latest user message,
@@ -74,7 +77,10 @@ internal sealed class ChatHandler(ISearchDbContext db, IEmbeddingGenerator<strin
         var history = string.Join("\n", messages.SkipLast(1).Select(m => $"{m.Role}: {m.Content}"));
         var userPrompt = $"Conversation so far:\n{history}\n\nLatest message: {lastUserMessage}\n\nRewritten search query:";
 
-        var rewritten = await llmClient.GenerateAsync(systemPrompt, userPrompt, cancellationToken);
-        return string.IsNullOrWhiteSpace(rewritten) ? lastUserMessage : rewritten.Trim();
+        var response = await chatClient.GetResponseAsync(
+            [new ChatMessage(ChatRole.System, systemPrompt), new ChatMessage(ChatRole.User, userPrompt)],
+            cancellationToken: cancellationToken);
+
+        return string.IsNullOrWhiteSpace(response.Text) ? lastUserMessage : response.Text.Trim();
     }
 }
