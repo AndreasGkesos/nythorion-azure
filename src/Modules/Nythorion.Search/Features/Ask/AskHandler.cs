@@ -1,6 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Nythorion.Embeddings.OllamaClient;
+using Microsoft.Extensions.AI;
 using Nythorion.Search.Data;
 using Nythorion.Search.OllamaClient;
 using Pgvector;
@@ -8,15 +8,15 @@ using Pgvector.EntityFrameworkCore;
 
 namespace Nythorion.Search.Features.Ask;
 
-internal sealed class AskHandler(ISearchDbContext db, OllamaEmbeddingClient embeddingClient, OllamaLlmClient llmClient)
+internal sealed class AskHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, OllamaLlmClient llmClient)
     : IRequestHandler<AskQuery, AskResult>
 {
     private const int TopK = 8;
 
     public async Task<AskResult> Handle(AskQuery request, CancellationToken cancellationToken)
     {
-        var queryEmbedding = await embeddingClient.GetEmbeddingAsync(request.Question, cancellationToken);
-        var queryVector = new Vector(queryEmbedding);
+        var queryEmbedding = await embeddingGenerator.GenerateAsync(request.Question, cancellationToken: cancellationToken);
+        var queryVector = new Vector(queryEmbedding.Vector);
 
         var query = db.DocumentChunks.Where(c => c.Embedding != null && c.Document.UserId == request.UserId);
 

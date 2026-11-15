@@ -1,15 +1,16 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Nythorion.Embeddings.OllamaClient;
+using Microsoft.Extensions.AI;
 using Nythorion.Search.Data;
 using Nythorion.Search.OllamaClient;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
+using ChatMessage = Nythorion.Search.OllamaClient.ChatMessage;
 
 namespace Nythorion.Search.Features.Chat;
 
-internal sealed class ChatHandler(ISearchDbContext db, OllamaEmbeddingClient embeddingClient, OllamaLlmClient llmClient, ILogger<ChatHandler> logger)
+internal sealed class ChatHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, OllamaLlmClient llmClient, ILogger<ChatHandler> logger)
     : IRequestHandler<ChatQuery, ChatResult>
 {
     private const int TopK = 8;
@@ -32,8 +33,8 @@ internal sealed class ChatHandler(ISearchDbContext db, OllamaEmbeddingClient emb
 
         logger.LogInformation("Chat search query: {Query}", searchQuery);
 
-        var queryEmbedding = await embeddingClient.GetEmbeddingAsync(searchQuery, cancellationToken);
-        var queryVector = new Vector(queryEmbedding);
+        var queryEmbedding = await embeddingGenerator.GenerateAsync(searchQuery, cancellationToken: cancellationToken);
+        var queryVector = new Vector(queryEmbedding.Vector);
 
         var query = db.DocumentChunks.Where(c => c.Embedding != null && c.Document.UserId == request.UserId);
 

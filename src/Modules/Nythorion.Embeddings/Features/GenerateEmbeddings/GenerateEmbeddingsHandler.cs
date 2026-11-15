@@ -1,25 +1,30 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Nythorion.Embeddings.Data;
-using Nythorion.Embeddings.OllamaClient;
 using Pgvector;
 
 namespace Nythorion.Embeddings.Features.GenerateEmbeddings;
 
-public class GenerateEmbeddingsHandler(IEmbeddingsDbContext db, OllamaEmbeddingClient ollamaClient)
+public class GenerateEmbeddingsHandler(IEmbeddingsDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
     : IRequestHandler<GenerateEmbeddingsCommand, GenerateEmbeddingsResult>
 {
+    private const int MaxChunkLength = 6000;
+    private const int BatchSize = 64;
+
     public async Task<GenerateEmbeddingsResult> Handle(GenerateEmbeddingsCommand request, CancellationToken cancellationToken)
     {
         var chunks = await db.DocumentChunks
             .Where(c => c.DocumentId == request.DocumentId && c.Embedding == null)
             .ToListAsync(cancellationToken);
 
-        foreach (var chunk in chunks)
+        foreach (var batch in chunks.Chunk(BatchSize))
         {
-            var text = chunk.Content.Length > 6000 ? chunk.Content[..6000] : chunk.Content;
-            var floats = await ollamaClient.GetEmbeddingAsync(text, cancellationToken);
-            chunk.Embedding = new Vector(floats);
+            var texts = batch.Select(c => c.Content.Length > MaxChunkLength ? c.Content[..MaxChunkLength] : c.Content).ToList();
+            var embeddings = await embeddingGenerator.GenerateAsync(texts, cancellationToken: cancellationToken);
+
+            for (var i = 0; i < batch.Length; i++)
+                batch[i].Embedding = new Vector(embeddings[i].Vector);
         }
 
         await db.SaveChangesAsync(cancellationToken);

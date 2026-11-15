@@ -1,19 +1,19 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Nythorion.Embeddings.OllamaClient;
+using Microsoft.Extensions.AI;
 using Nythorion.Search.Data;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 
 namespace Nythorion.Search.Features.SemanticSearch;
 
-internal sealed class SemanticSearchHandler(ISearchDbContext db, OllamaEmbeddingClient ollamaClient)
+internal sealed class SemanticSearchHandler(ISearchDbContext db, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
     : IRequestHandler<SemanticSearchQuery, List<SemanticSearchResult>>
 {
     public async Task<List<SemanticSearchResult>> Handle(SemanticSearchQuery request, CancellationToken cancellationToken)
     {
-        var queryEmbedding = await ollamaClient.GetEmbeddingAsync(request.Text, cancellationToken);
-        var queryVector = new Vector(queryEmbedding);
+        var queryEmbedding = await embeddingGenerator.GenerateAsync(request.Text, cancellationToken: cancellationToken);
+        var queryVector = new Vector(queryEmbedding.Vector);
 
         var query = db.DocumentChunks.Where(c => c.Embedding != null && c.Document.UserId == request.UserId);
 

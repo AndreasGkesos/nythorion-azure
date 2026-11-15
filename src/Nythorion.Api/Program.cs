@@ -20,9 +20,8 @@ builder.Services.AddDatabase(builder.Configuration);
 builder.Services.AddAuth(builder.Configuration);
 builder.Services.AddProcessing();
 builder.Services.AddDocumentsModule();
-builder.Services.AddEmbeddingsModule(
-    builder.Configuration["Ollama:BaseUrl"]!,
-    builder.Configuration["Ollama:EmbedModel"]!);
+builder.Services.AddAzureOpenAi(builder.Configuration);
+builder.Services.AddEmbeddingsModule();
 builder.Services.AddSearchModule(
     builder.Configuration["Ollama:BaseUrl"]!,
     builder.Configuration["Ollama:LlmModel"]!,
@@ -60,7 +59,7 @@ app.MapLearningEndpoints();
 app.MapGet("/config", (IConfiguration config) => Results.Ok(new
 {
     llmModel    = config["Ollama:LlmModel"],
-    embedModel  = config["Ollama:EmbedModel"],
+    embedModel  = config["AzureOpenAI:EmbeddingDeployment"],
     temperature = config.GetValue<float>("Ollama:Temperature", 0.1f),
     numPredict  = config.GetValue<int>("Ollama:NumPredict", 4096)
 })).RequireAuthorization();
