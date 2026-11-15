@@ -10,5 +10,8 @@
   },
   "Auth": {
     "Issuer": "https://localhost:7087"
+  },
+  "AzureOpenAI": {
+    "Endpoint": "https://YOUR_ACCOUNT.openai.azure.com/"
   }
 }
