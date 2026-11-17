@@ -1,0 +1,78 @@
+name: Deploy web to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/Nythorion.Web/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-nythorion
+  API_APP: ca-nyth-api
+  AUTH_APP: ca-nyth-auth
+  WEB_DIR: src/Nythorion.Web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ env.WEB_DIR }}/package-lock.json
+
+      - name: Build
+        working-directory: ${{ env.WEB_DIR }}
+        run: |
+          npm ci
+          npx ng build --configuration production
+
+      # OIDC: no stored password or key, see deploy.yml
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # The backend addresses are read from Azure, so they are not stored anywhere
+      - name: Write config.json for the deployed backend
+        run: |
+          api=$(az containerapp show --name "$API_APP" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn --output tsv)
+          auth=$(az containerapp show --name "$AUTH_APP" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn --output tsv)
+          printf '{ "apiUrl": "https://%s", "authUrl": "https://%s" }\n' "$api" "$auth" > "$WEB_DIR/dist/Nythorion.Web/browser/config.json"
+
+      # The deployment token is fetched at run time, so it is never stored in GitHub
+      - name: Upload to the Static Web App
+        run: |
+          app=$(az staticwebapp list --resource-group "$RESOURCE_GROUP" --query "[0].name" --output tsv)
+          token=$(az staticwebapp secrets list --name "$app" --resource-group "$RESOURCE_GROUP" --query properties.apiKey --output tsv)
+          echo "::add-mask::$token"
+          SWA_CLI_DEPLOYMENT_TOKEN="$token" npx --yes @azure/static-web-apps-cli deploy "$WEB_DIR/dist/Nythorion.Web/browser" --env production
+
+      - name: Check the site serves the new config
+        run: |
+          host=$(az staticwebapp list --resource-group "$RESOURCE_GROUP" --query "[0].defaultHostname" --output tsv)
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --max-time 10 "https://${host}/config.json" | grep -q apiUrl; then
+              echo "Serving https://${host} after ${attempt} attempt(s)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "The site did not serve config.json" >&2
+          exit 1
