@@ -79,7 +79,7 @@ To remove everything, including the soft-deleted Azure OpenAI account so its nam
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `build-images.yml` | push to `main` | Runs all tests, then builds the API and auth images and pushes them to GHCR tagged with the commit SHA |
-| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers. It also updates the auth container app when `src/Nythorion.Auth` changed, because restarting that server signs everyone out (this step was written but never exercised, since no commit touched the auth server after it was added) |
+| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers. It also updates the auth container app when `src/Nythorion.Auth` changed, because restarting that server signs everyone out |
 | `deploy-web.yml` | push touching `src/Nythorion.Web` | Builds the Angular app, reads the API and auth addresses from Azure into `config.json`, fetches the Static Web App deployment token at run time, uploads the build, and checks that the site serves the new config |
 
 Only the infrastructure itself is not in the pipeline. The Bicep template is applied by hand, as it normally is.
