@@ -21,6 +21,7 @@ concurrency:
 env:
   RESOURCE_GROUP: rg-nythorion
   API_APP: ca-nyth-api
+  AUTH_APP: ca-nyth-auth
 
 jobs:
   deploy:
@@ -31,11 +32,24 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Work out the image
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha || github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+
+      - name: Work out the images
         id: image
         env:
           SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
-        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nythorion-api:${SHA}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nythorion-api:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "auth_ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nythorion-auth:${SHA}" >> "$GITHUB_OUTPUT"
+          # Auth keeps its signing keys in memory, so restarting it signs everyone out: only redeploy it when it changed
+          if git diff --quiet HEAD~1 HEAD -- src/Nythorion.Auth; then
+            echo "auth_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "auth_changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       # OIDC: GitHub proves who it is to Azure, so no stored password or key exists
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -50,6 +64,15 @@ jobs:
           --name "$API_APP"
           --resource-group "$RESOURCE_GROUP"
           --image "${{ steps.image.outputs.ref }}"
+          --output none
+
+      - name: Update the auth container app
+        if: steps.image.outputs.auth_changed == 'true'
+        run: >
+          az containerapp update
+          --name "$AUTH_APP"
+          --resource-group "$RESOURCE_GROUP"
+          --image "${{ steps.image.outputs.auth_ref }}"
           --output none
 
       - name: Check the new revision is healthy
