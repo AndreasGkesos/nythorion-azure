@@ -15,6 +15,9 @@ param(
     # Leave empty to use the defaults in main.bicep. Needed when the subscription restricts those regions
     [string] $PostgresLocation = '',
     [string] $StaticWebAppLocation = '',
+    # Object ID of a person who may call Azure OpenAI from their own machine: az ad signed-in-user show --query id -o tsv
+    [string] $DeveloperPrincipalId = '',
+    # The resource group is still created, because what-if needs it to exist
     [switch] $WhatIf
 )
 
@@ -56,6 +59,7 @@ $deployment = @(
 
 if ($PostgresLocation) { $deployment += "postgresLocation=$PostgresLocation" }
 if ($StaticWebAppLocation) { $deployment += "staticWebAppLocation=$StaticWebAppLocation" }
+if ($DeveloperPrincipalId) { $deployment += "developerPrincipalId=$DeveloperPrincipalId" }
 
 az @deployment
 Assert-Success 'The deployment'
