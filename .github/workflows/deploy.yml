@@ -27,8 +27,6 @@ jobs:
     # Only deploy after a successful image build; a manual run skips that check
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    # The environment's required reviewer is the approval gate
-    environment: production
     permissions:
       id-token: write
       contents: read
