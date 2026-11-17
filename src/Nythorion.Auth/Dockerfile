@@ -9,6 +9,7 @@ COPY src/Nythorion.Auth src/Nythorion.Auth
 RUN dotnet publish src/Nythorion.Auth/Nythorion.Auth.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+LABEL org.opencontainers.image.source="https://github.com/AndreasGkesos/nythorion-azure"
 WORKDIR /app
 COPY --from=build /app .
 USER $APP_UID
