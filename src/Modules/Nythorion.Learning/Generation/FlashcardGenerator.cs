@@ -12,7 +12,7 @@ internal sealed class FlashcardGenerator(IChatClient chatClient, ILogger<Flashca
     private const string SystemPrompt = """
         You are a flashcard generator. Create 1 flashcard from the provided text.
         The question must be clear and complete — someone reading it with no context should understand what is being asked.
-        The answer must be a full sentence explanation.
+        The answer must be a full sentence explanation. It must not repeat or restate the question.
         Good example: {"question":"What communication mechanism do microservices use?","answer":"Microservices communicate via lightweight mechanisms such as HTTP or message queues."}
         Bad example: {"question":"What is communicationMechanism?","answer":"HTTP"}
         Output ONLY a valid JSON object with EXACTLY these two fields: "question" and "answer". No extra text, no markdown.
@@ -74,13 +74,24 @@ internal sealed class FlashcardGenerator(IChatClient chatClient, ILogger<Flashca
                 return null;
             }
 
-            return Flashcard.Create(documentId, parsed.Question, parsed.Answer);
+            return Flashcard.Create(documentId, parsed.Question, WithoutLeadingQuestion(parsed.Question, parsed.Answer));
         }
         catch (JsonException ex)
         {
             logger.LogWarning("Parse: JSON exception — {Message}", ex.Message);
             return null;
         }
+    }
+
+    // The model sometimes starts the answer by repeating the question, which reads badly on a card
+    private static string WithoutLeadingQuestion(string question, string answer)
+    {
+        var trimmed = answer.TrimStart();
+        if (!trimmed.StartsWith(question.Trim(), StringComparison.OrdinalIgnoreCase))
+            return answer;
+
+        var remainder = trimmed[question.Trim().Length..].TrimStart();
+        return remainder.Split(' ').Length < 4 ? answer : remainder;
     }
 
     private static readonly HashSet<string> StopWords =
