@@ -12,6 +12,9 @@ param(
     [string] $Location = 'swedencentral',
     [string] $SeedUsername = 'demo',
     [string] $ClientIp = '',
+    # Leave empty to use the defaults in main.bicep. Needed when the subscription restricts those regions
+    [string] $PostgresLocation = '',
+    [string] $StaticWebAppLocation = '',
     [switch] $WhatIf
 )
 
@@ -50,6 +53,9 @@ $deployment = @(
     "seedPassword=$($secrets.seedPassword)",
     "clientIp=$ClientIp"
 )
+
+if ($PostgresLocation) { $deployment += "postgresLocation=$PostgresLocation" }
+if ($StaticWebAppLocation) { $deployment += "staticWebAppLocation=$StaticWebAppLocation" }
 
 az @deployment
 Assert-Success 'The deployment'
