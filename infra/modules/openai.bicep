@@ -44,7 +44,8 @@ resource embeddings 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01
   dependsOn: [chat]
   sku: {
     name: 'GlobalStandard'
-    capacity: 10
+    // Uploading a book sends thousands of chunks; at 10 (10K tokens/minute) the service answers HTTP 429
+    capacity: 100
   }
   properties: {
     model: {
