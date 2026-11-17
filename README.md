@@ -124,7 +124,16 @@ The login error message also prints the exact subject it received. Then store th
 ./infra/down.ps1
 ```
 
-This deletes the resource group, purges the soft-deleted Azure OpenAI account so its name and quota can be reused, and removes the local secrets file. The Entra app registration and the GitHub secrets are separate and stay until you delete them.
+This deletes the resource group, purges the soft-deleted Azure OpenAI account so its name and quota can be reused, and removes the local secrets file. The Entra app registration and the GitHub secrets are separate and stay until you delete them:
+
+```bash
+az ad app delete --id $(az ad app list --display-name nythorion-github-deploy --query "[0].appId" -o tsv)
+gh secret delete AZURE_CLIENT_ID --repo <owner>/<repo>
+gh secret delete AZURE_TENANT_ID --repo <owner>/<repo>
+gh secret delete AZURE_SUBSCRIPTION_ID --repo <owner>/<repo>
+```
+
+Until the secrets are removed, every push to `main` makes the deploy workflows fail at the Azure login. To confirm that nothing is left, `az group list` should show no `rg-nythorion`, and `az ad app list --display-name nythorion-github-deploy` should return an empty list.
 
 ### Coming back later
 
