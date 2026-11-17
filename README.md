@@ -64,7 +64,7 @@ Needs the Azure CLI (logged in), Bicep, and two container images built by the pi
 
 The script creates the resource group, generates the database and seed-user passwords into a git-ignored file (`infra/.secrets.local.json`), and deploys `infra/main.bicep`. `-WhatIf` previews the changes.
 
-Afterwards build the Angular app, write the deployed API and auth URLs into `config.json` in the build output, and upload it to the Static Web App.
+Afterwards the Angular app is deployed by the `deploy-web.yml` workflow, which reads the deployed API and auth addresses from Azure. It can be started manually from the Actions tab.
 
 To remove everything, including the soft-deleted Azure OpenAI account so its name and quota can be reused:
 
@@ -79,7 +79,10 @@ To remove everything, including the soft-deleted Azure OpenAI account so its nam
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `build-images.yml` | push to `main` | Runs all tests, then builds the API and auth images and pushes them to GHCR tagged with the commit SHA |
-| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers |
+| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers. It also updates the auth container app when `src/Nythorion.Auth` changed, because restarting that server signs everyone out (this step was written but never exercised, since no commit touched the auth server after it was added) |
+| `deploy-web.yml` | push touching `src/Nythorion.Web` | Builds the Angular app, reads the API and auth addresses from Azure into `config.json`, fetches the Static Web App deployment token at run time, uploads the build, and checks that the site serves the new config |
+
+Only the infrastructure itself is not in the pipeline. The Bicep template is applied by hand, as it normally is.
 
 The deploy identity is an Entra app registration with a **federated credential** that trusts only this repository's `main` branch, and the **Contributor** role on the single resource group. No client secret exists. All third-party actions are pinned to commit SHAs.
 
