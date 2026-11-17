@@ -1,194 +1,159 @@
-# Nythorion
+# Nythorion on Azure
 
-A personal knowledge base powered by local AI. Upload your PDFs and DOCX files, then ask questions, generate summaries, build flashcards, quizzes and notes — everything runs on your own machine, no subscriptions, no data leaving your computer.
+A proof of concept that deploys **Nythorion**, an AI knowledge and learning platform, to Azure. You upload PDF and DOCX files, then search them semantically, chat with them (RAG), and generate summaries, flashcards and quizzes.
 
-Tested on an NVIDIA RTX 3060 6GB with `qwen2.5:7b-instruct-q4_K_M`.
+The application started as a local project that ran on Ollama. This fork replaces Ollama with **Azure OpenAI** and adds the infrastructure and pipeline needed to run it on a free trial subscription:
 
-> Built as an exploration project to see how .NET 9, Angular, OpenIddict, pgvector, and local LLMs fit together in practice. Developed with the assistance of [Claude](https://claude.ai).
+- **Infrastructure as code** with Bicep, deployed and torn down by script
+- **Azure Container Apps** for the API and the auth server, **Static Web Apps** for the Angular app
+- **PostgreSQL Flexible Server** with the pgvector extension for documents and embeddings
+- **Azure OpenAI** reached through a managed identity, with no API keys anywhere
+- **GitHub Actions** that test, build images to GHCR and deploy to Azure through OIDC
 
----
+> Built for hands-on learning. The environment was deployed, tested and then deleted to stay within the trial credit, so there is no live URL.
 
-## Prerequisites
-
-Download and install each of these before starting:
-
-| Tool | Version |
-|------|---------|
-| .NET SDK | 9.0 |
-| Node.js | 20+ |
-| Docker Desktop | latest |
-| Ollama | latest |
-
-> **GPU note:** A dedicated GPU with 6GB+ VRAM is recommended for acceptable response times. Ollama can run on CPU only, but generation will be slow.
-
----
-
-## First-time setup
-
-### 1. Trust the HTTPS development certificate
-
-Run this once per machine after installing the .NET SDK:
-
-```bash
-dotnet dev-certs https --trust
-```
-
-When prompted, click **Yes** to trust the certificate.
-
-### 2. Start PostgreSQL
-
-Make sure Docker Desktop is open and running, then from the repo root:
-
-```bash
-docker compose -f docker/docker-compose.yml up -d
-```
-
-This starts a PostgreSQL container on port 5432 and creates two databases: `nythorion` and `nythorion_auth`.
-
-### 3. Pull Ollama models
-
-Make sure Ollama is running (it should appear in your system tray after installation), then pull the two models the app uses:
-
-```bash
-ollama pull qwen2.5:7b-instruct-q4_K_M
-ollama pull nomic-embed-text
-```
-
-The first model (~4.7GB) handles text generation. The second handles search embeddings. This only needs to be done once.
-
-### 4. Configure the API
-
-Copy the example config file:
-
-- **bash:** `cp src/Nythorion.Api/appsettings.Development.json.example src/Nythorion.Api/appsettings.Development.json`
-- **PowerShell:** `copy src/Nythorion.Api/appsettings.Development.json.example src/Nythorion.Api/appsettings.Development.json`
-
-The default values work out of the box if you used the Docker Compose file from step 2:
-
-```json
-{
-  "ConnectionStrings": {
-    "Default": "Host=localhost;Port=5432;Database=nythorion;Username=nythorion;Password=nythorion"
-  },
-  "Auth": {
-    "Issuer": "https://localhost:7087"
-  }
-}
-```
-
-### 5. Configure the Auth server
-
-Copy the example config file:
-
-- **bash:** `cp src/Nythorion.Auth/appsettings.Development.json.example src/Nythorion.Auth/appsettings.Development.json`
-- **PowerShell:** `copy src/Nythorion.Auth/appsettings.Development.json.example src/Nythorion.Auth/appsettings.Development.json`
-
-Then open the file and set a password for the admin account you will use to log in:
-
-```json
-{
-  "ConnectionStrings": {
-    "Default": "Host=localhost;Port=5432;Database=nythorion_auth;Username=nythorion;Password=nythorion"
-  },
-  "Registration": {
-    "Enabled": true
-  },
-  "SeedUsers": [
-    { "Username": "admin", "Password": "your-password-here" }
-  ]
-}
-```
-
-### 6. Restore .NET tools and run database migrations
-
-First restore the local tools (includes the EF Core CLI):
-
-```bash
-dotnet tool restore
-```
-
-Then create the database tables:
-
-```bash
-dotnet ef database update --project src/Nythorion.Api
-dotnet ef database update --project src/Nythorion.Auth
-```
-
-You only need to run migrations once, and again after pulling updates that include new migrations.
-
-### 7. Install frontend dependencies
-
-```bash
-cd src/Nythorion.Web
-npm install
-cd ../..
-```
-
----
-
-## Running
-
-You need three things running at the same time. Open three separate terminals from the repo root:
-
-```bash
-# Terminal 1 — Auth server (must use the https profile to bind to port 7087)
-dotnet run --project src/Nythorion.Auth --launch-profile https
-
-# Terminal 2 — API
-dotnet run --project src/Nythorion.Api --launch-profile https
-
-# Terminal 3 — Frontend
-cd src/Nythorion.Web
-npm start
-```
-
-Then open `http://localhost:4200` and log in with the admin credentials you set in step 5.
-
-> **Docker and Ollama must be running** before you start the backend.
-
----
-
-## Running tests
-
-```bash
-# Unit tests
-dotnet test tests/Nythorion.Documents.Tests
-dotnet test tests/Nythorion.Learning.Tests
-
-# Integration tests (requires Docker)
-dotnet test tests/Nythorion.Api.IntegrationTests
-```
-
-Integration tests use Testcontainers to automatically spin up a real PostgreSQL container just for the test run — no manual setup needed, but Docker must be running so the container can be created.
+![A follow-up question resolved from the conversation history and answered from the uploaded document](docs/chat.png)
 
 ---
 
 ## Architecture
 
-- **Modular monolith** — modules are .NET class libraries composed by the API host
-- **Vertical Slice Architecture** — each feature is a self-contained request/handler pair
-- **MediatR** — all features go through command/query handlers
-- **Shared DbContext** — one `NythorionDbContext` in the API host; modules contribute EF configurations
-- **Ollama** — runs on the host machine; `qwen2.5:7b` for generation, `nomic-embed-text` for embeddings (768 dimensions)
-- **pgvector** — stores and queries embeddings for semantic search
+```mermaid
+flowchart LR
+    user([Browser]) --> swa[Static Web App<br/>Angular]
+    swa -->|OAuth 2.0 + PKCE| auth[Container App<br/>Auth server]
+    swa -->|Bearer token| api[Container App<br/>API]
+    api -->|validates tokens| auth
+    api --> pg[(PostgreSQL<br/>pgvector)]
+    auth --> pg
+    api -->|managed identity| aoai[Azure OpenAI<br/>gpt-4.1-mini<br/>text-embedding-3-small]
+
+    gh[GitHub Actions] -->|push image| ghcr[(GHCR)]
+    gh -->|OIDC login<br/>az containerapp update| api
+    ghcr -.->|pull| api
+    ghcr -.->|pull| auth
+```
+
+| Resource | Purpose | Notes |
+|---|---|---|
+| Container Apps environment + Log Analytics | Hosts both apps, collects logs | Log ingestion capped at 0.1 GB/day |
+| `ca-nyth-api` | .NET API: documents, search, chat, flashcards, quizzes | 0.5 CPU, 1 GiB, exactly one replica |
+| `ca-nyth-auth` | OpenIddict auth server | 0.25 CPU, 0.5 GiB, one replica |
+| Static Web App | Angular frontend | Free tier |
+| PostgreSQL Flexible Server | Databases `nythorion` and `nythorion_auth` | Burstable B1ms, 32 GB, pgvector enabled |
+| Azure OpenAI | Chat and embeddings | `GlobalStandard` deployments, local auth disabled |
+
+The application code is a modular monolith with vertical slices and MediatR. The AI calls go through `Microsoft.Extensions.AI` (`IChatClient` and `IEmbeddingGenerator`), so the application does not depend on a specific provider.
+
+### Design decisions
+
+- **No secrets in the application.** The API calls Azure OpenAI as itself. Its system-assigned identity holds the `Cognitive Services OpenAI User` role, and the SDK gets tokens through `DefaultAzureCredential`. Local API key authentication on the OpenAI account is disabled.
+- **One API replica on purpose.** The document processing queue lives in memory, so scaling out would split the work and lose jobs.
+- **Explicit token issuer.** The auth server sets its issuer from configuration, because behind the Container Apps ingress it cannot reliably derive its own public URL.
+- **Everything in one resource group.** One command deletes it all, which is how the trial credit is protected.
 
 ---
 
-## Ollama configuration
+## Deploying
 
-The default model and settings are in `src/Nythorion.Api/appsettings.json`. You can override them in `appsettings.Development.json`:
+Needs the Azure CLI (logged in), Bicep, and two container images built by the pipeline.
 
-```json
-"Ollama": {
-  "BaseUrl": "http://localhost:11434",
-  "LlmModel": "qwen2.5:7b-instruct-q4_K_M",
-  "EmbedModel": "nomic-embed-text",
-  "Temperature": 0.1,
-  "NumPredict": 4096
-}
+```powershell
+./infra/up.ps1 -ApiImage ghcr.io/<owner>/nythorion-api:<sha> -AuthImage ghcr.io/<owner>/nythorion-auth:<sha>
 ```
 
-A 6GB GPU is sufficient for `qwen2.5:7b-instruct-q4_K_M`. Larger models will require more VRAM. Document processing (embeddings + initial generation) runs in the background after upload.
+The script creates the resource group, generates the database and seed-user passwords into a git-ignored file (`infra/.secrets.local.json`), and deploys `infra/main.bicep`. `-WhatIf` previews the changes.
 
-- **Temperature** controls how creative or predictable the model's responses are. `0.1` is very low, meaning the model sticks closely to the facts in the document and avoids making things up. Higher values (e.g. `0.8`) produce more varied but less reliable answers.
-- **NumPredict** is the maximum number of tokens (roughly words) the model can generate in a single response. `4096` is enough for detailed summaries and answers. Lower it if responses feel slow; raise it if they get cut off.
+Afterwards build the Angular app, write the deployed API and auth URLs into `config.json` in the build output, and upload it to the Static Web App.
+
+To remove everything, including the soft-deleted Azure OpenAI account so its name and quota can be reused:
+
+```powershell
+./infra/down.ps1
+```
+
+---
+
+## Pipeline
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `build-images.yml` | push to `main` | Runs all tests, then builds the API and auth images and pushes them to GHCR tagged with the commit SHA |
+| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers |
+
+The deploy identity is an Entra app registration with a **federated credential** that trusts only this repository's `main` branch, and the **Contributor** role on the single resource group. No client secret exists. All third-party actions are pinned to commit SHAs.
+
+The pipeline was proven with a real change: a prompt fix for flashcards was committed, built and deployed, and the live logs showed the new model behaviour a few minutes later.
+
+---
+
+## What was verified on Azure
+
+Checked by hand against the deployed environment, with test documents and a 50-page architecture book:
+
+- Login through the authorization code flow with PKCE
+- Upload and processing: parsing, chunking and embedding into pgvector
+- Semantic search that returns the right chapter for queries that share few words with the text
+- RAG chat: grounded answers, follow-up questions that depend on history, a comparison across two chapters, and refusals for questions the document does not cover
+- Summary (map-reduce over all chunks), flashcards and quizzes with `gpt-4.1-mini`
+
+The test document contains invented statistics, so an answer that quotes them can only have come from the document and not from the model's training data.
+
+![An answer built from several chunks of the test document](docs/chat-grounded.png)
+
+The automated tests (75 across unit and integration projects) use fakes for the AI services, so they run without Azure.
+
+---
+
+## Lessons from the deployment
+
+- **Trial subscriptions are restricted by region.** West Europe, East US and Germany West Central were unavailable. Postgres, Container Apps and Azure OpenAI each had a different usable region, so the template takes a separate location for Postgres and the Static Web App.
+- **Model availability moves.** `gpt-4o-mini` is deprecated and `gpt-4.1-mini` has no `Standard` quota on the trial, but works as `GlobalStandard`.
+- **Rate limits break bulk jobs.** With the default embedding capacity of 10 (about 10,000 tokens per minute), a book failed with HTTP 429 halfway through. Raising the capacity to 100 fixed it. Capacity is a limit, not a reservation, so it costs nothing extra.
+- **OIDC subject claims changed.** GitHub now includes numeric owner and repository IDs in the subject, so a federated credential written with plain names fails with `AADSTS700213`. The error message contains the exact subject to use.
+- **Model output habits differ.** `gpt-4.1-mini` sometimes started a flashcard answer by repeating the question. A one-line prompt change fixed it, with a safety net in the parser.
+
+## Known limitations
+
+- Auth signing keys and ASP.NET Data Protection keys are created at startup, so restarting the auth server signs everyone out.
+- The processing queue is in memory, so a restart drops documents that were still being processed.
+- A question that compares two topics can have its retrieval crowded out by one of them. Chat retrieves 8 chunks, which usually covers both, but it is not guaranteed.
+- Chunking ignores document structure, so a chunk can span a chapter boundary, and PDF text keeps hyphenation and page footers.
+- Two simultaneous "generate flashcard" requests can create the same card, because the duplicate check reads existing questions once per request.
+- Quizzes reuse flashcard answers as the wrong options, so the distractors are easy to rule out.
+- Registration is closed and a single seeded demo account exists. There is no production hardening beyond that.
+
+## Cost
+
+While running, the environment was estimated at roughly $1 to $2 per day, mostly the always-on Container Apps replicas and the Postgres server. The embedding calls for a 50-page book cost a fraction of a cent. The deployment was removed after testing.
+
+---
+
+## Local development
+
+Run the three services against a local Postgres with pgvector:
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+dotnet tool restore
+dotnet ef database update --project src/Nythorion.Api
+dotnet ef database update --project src/Nythorion.Auth
+```
+
+Copy each `appsettings.Development.json.example` to `appsettings.Development.json` and fill in the values. The API example points at an Azure OpenAI endpoint, and your own identity needs the `Cognitive Services OpenAI User` role on it. The Bicep parameter `developerPrincipalId` grants that role at deploy time.
+
+```bash
+dotnet run --project src/Nythorion.Auth --launch-profile https
+dotnet run --project src/Nythorion.Api --launch-profile https
+cd src/Nythorion.Web && npm install && npm start
+```
+
+Tests:
+
+```bash
+dotnet test
+```
+
+Integration tests start a PostgreSQL container with Testcontainers, so Docker must be running.
+
+> Built as an exploration project with the assistance of [Claude](https://claude.ai).
