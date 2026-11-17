@@ -51,7 +51,7 @@ The application code is a modular monolith with vertical slices and MediatR. The
 - **One API replica on purpose.** The document processing queue lives in memory, so scaling out would split the work and lose jobs.
 - **Explicit token issuer.** The auth server sets its issuer from configuration, because behind the Container Apps ingress it cannot reliably derive its own public URL.
 - **Everything in one resource group.** One command deletes it all, which is how the trial credit is protected.
-- **Deploy on every push, without an approval gate.** Fine for a single-person proof of concept. For anything real, put an approval step in front of the deploy.
+- **Deploy on every push that changes the code, without an approval gate.** Pushes that touch only `src/`, `tests/` or the build workflow build images, and only a successful build deploys. Fine for a single-person proof of concept. For anything real, put an approval step in front of the deploy.
 
 ---
 
@@ -64,27 +64,28 @@ The application code is a modular monolith with vertical slices and MediatR. The
 
   ```bash
   az cognitiveservices model list --location <region> --output table
+  az cognitiveservices usage list --location <region> --output table    # your quota
   az postgres flexible-server list-skus --location <region>
   ```
 
 - **Resource providers:** on the trial used here, `Microsoft.App`, `Microsoft.CognitiveServices` and `Microsoft.DBforPostgreSQL` were registered by hand (`az provider register --namespace <name>`). Check them on a fresh subscription.
-- **Regions are trial-specific.** The defaults (`location` from the resource group, Postgres in `denmarkeast`, the Static Web App in `centralus`) are what worked on one trial subscription, where West Europe, East US and Germany West Central were restricted. Postgres and the Static Web App can be overridden with `-PostgresLocation` and `-StaticWebAppLocation` on `up.ps1`.
+- **Regions are trial-specific.** The defaults are what worked on one trial subscription, where West Europe, East US and Germany West Central were restricted: the resource group, OpenAI and Container Apps in `swedencentral` (`up.ps1 -Location`), Postgres in `denmarkeast`, and the Static Web App in `centralus`. Override them with `-Location`, `-PostgresLocation` and `-StaticWebAppLocation` on `up.ps1`. `down.ps1` has its own `-Location` (default `swedencentral`), which must match the group's region so the OpenAI purge finds the account.
 
 ### First deployment, in order
 
 1. **Get the images built.** Push this repository to your own GitHub account. The `Build images` workflow runs the tests and pushes `nythorion-api` and `nythorion-auth` to `ghcr.io/<owner>/`, tagged with the commit SHA. The deploy workflows fail on this first run because Azure does not exist yet. That is expected.
 2. **Make both packages public.** GitHub → your profile → Packages → each package → Package settings → Change visibility → Public. New packages are private, and Container Apps pulls without credentials, so a private package makes the deployment fail on the image pull. The images contain no secrets.
-3. **Deploy the infrastructure** with the SHA from step 1:
+3. **Deploy the infrastructure** with the full 40-character commit SHA from step 1 (`git rev-parse HEAD`, also shown on the build run):
 
    ```powershell
    ./infra/up.ps1 -ApiImage ghcr.io/<owner>/nythorion-api:<sha> -AuthImage ghcr.io/<owner>/nythorion-auth:<sha>
    ```
 
-   The script creates the resource group, generates the database and demo-user passwords into the git-ignored `infra/.secrets.local.json`, and deploys `infra/main.bicep`. `-WhatIf` previews the changes. The deployment outputs include the API, auth and web addresses.
+   The script creates the resource group, generates the database and demo-user passwords into the git-ignored `infra/.secrets.local.json`, and deploys `infra/main.bicep`. `-WhatIf` previews the changes, but it still creates the empty resource group first, because what-if needs it to exist. Add `-DeveloperPrincipalId $(az ad signed-in-user show --query id -o tsv)` to let your own login call Azure OpenAI for local development. The deployment outputs include the API, auth and web addresses. The script reuses the secrets file on later runs: if you delete it while the database still exists, the password cannot be recovered, so reset it in the portal or delete the group and start again.
 
-   > **Status:** on the trial used here the CLI repeatedly failed on this request with a connection reset (`ConnectionResetError 10054`), so the template was deployed through the portal and `up.ps1` was never run through to the end. The template is the same either way. To use the portal: `az bicep build --file infra/main.bicep --outfile main.json`, then portal.azure.com → Deploy a custom template → Build your own template in the editor → Load file → choose the resource group, and fill in the parameters. Any random 24-character alphanumeric strings work as passwords.
+   > **Status:** on the trial used here the CLI repeatedly failed on this request with a connection reset (`ConnectionResetError 10054`), so the template was deployed through the portal and `up.ps1` was never run through to the end. The template is the same either way. To use the portal: `az bicep build --file infra/main.bicep --outfile main.json`, then portal.azure.com → Deploy a custom template → Build your own template in the editor → Load file → choose the resource group, and fill in the parameters listed at the top of `infra/main.bicep`. Any random 24-character alphanumeric strings work as passwords.
 4. **Create the GitHub to Azure trust** (below), then store its three IDs as repository secrets.
-5. **Publish the frontend** by running the `Deploy web to Azure` workflow from the Actions tab. After this, every push deploys by itself.
+5. **Publish the frontend** by running the `Deploy web to Azure` workflow from the Actions tab. Also run `Deploy to Azure` manually with the commit SHA, because its automatic run in step 1 failed. After this, every push that changes the code deploys by itself.
 
 ### The GitHub to Azure trust
 
@@ -145,7 +146,8 @@ Before rebuilding after months, check what has moved:
 - **.NET and Node.** To my knowledge .NET 9 leaves support in November 2026, so consider moving the projects and Dockerfiles to a newer version.
 - **Pinned versions.** The GitHub Actions are pinned to commit SHAs and the Bicep resources to API versions. Both age, so refresh them.
 - **The OIDC subject format** has changed once already. Use the `gh api` command above instead of typing it from memory.
-- **Resource names are hard-coded** in the workflows (`rg-nythorion`, `ca-nyth-api`, `ca-nyth-auth`). If you change `namePrefix` or the resource group, change the workflows too.
+- **Resource names are hard-coded** in the workflows (`rg-nythorion`, `ca-nyth-api`, `ca-nyth-auth`), and the resource group is also the default of `up.ps1` and `down.ps1`. If you change `namePrefix` or the resource group, change all of them.
+- **The pipeline changes images outside the template.** Re-running `up.ps1` resets the apps to the image tags you pass it, so pass the commit that is currently running.
 
 ---
 
@@ -154,20 +156,20 @@ Before rebuilding after months, check what has moved:
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `build-images.yml` | push to `main` | Runs all tests, then builds the API and auth images and pushes them to GHCR tagged with the commit SHA |
-| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers. It also updates the auth container app when `src/Nythorion.Auth` changed, because restarting that server signs everyone out |
+| `deploy.yml` | build succeeded | Logs in to Azure with OIDC, updates the API container app to the new image, and polls `/health` until it answers. It also updates the auth container app when `src/Nythorion.Auth` differs from the commit running there, because restarting that server signs everyone out. It can be started manually with a commit SHA |
 | `deploy-web.yml` | push touching `src/Nythorion.Web` | Builds the Angular app, reads the API and auth addresses from Azure into `config.json`, fetches the Static Web App deployment token at run time, uploads the build, and checks that the site serves the new config |
 
 The Bicep template is not part of the pipeline. It is applied by hand.
 
 The deploy identity is an Entra app registration with a **federated credential** that trusts only this repository's `main` branch, and the **Contributor** role on the single resource group. No client secret exists. All third-party actions are pinned to commit SHAs.
 
-The pipeline was proven with real changes: a prompt fix for flashcards, a change to the auth image, and the frontend workflow itself were each committed, built and deployed, and the results were checked in Azure and in the live logs.
+The pipeline was proven with real changes: a prompt fix for flashcards, a change to the auth image, and the frontend workflow itself were each committed, built and deployed, and the author checked the results in Azure and in the live logs. The run list on GitHub shows the green runs, but the Azure side no longer exists and some run logs were removed for privacy, so there is no replayable proof beyond that.
 
 ---
 
 ## What was verified on Azure
 
-Checked by hand against the deployed environment, with test documents and a short architecture book (about 60 pages):
+Checked by hand by the author against the deployed environment, with test documents and a short architecture book (about 60 pages). Apart from the two screenshots below, no recordings or logs of this are kept:
 
 - Login through the authorization code flow with PKCE
 - Upload and processing: parsing, chunking and embedding into pgvector
@@ -179,7 +181,7 @@ The test document contains invented statistics, so an answer that quotes them ca
 
 ![An answer built from several chunks of the test document](docs/chat-grounded.png)
 
-The automated tests (75 across unit and integration projects) use fakes for the AI services, so they run without Azure.
+The automated tests (75 in the last CI run: 26 + 16 + 33 across three projects) use fakes for the AI services, so they run without Azure.
 
 ---
 
@@ -217,10 +219,9 @@ Prerequisites: .NET 9 SDK, Node 22 or newer, Docker.
 ```bash
 dotnet dev-certs https --trust          # once per machine
 docker compose -f docker/docker-compose.yml up -d
-dotnet tool restore
-dotnet ef database update --project src/Nythorion.Api
-dotnet ef database update --project src/Nythorion.Auth
 ```
+
+Both apps apply their own migrations on startup, so there is no `dotnet ef` step. The Compose file also has an `apps` profile (`docker compose -f docker/docker-compose.yml --profile apps up --build`) that runs both apps as containers, which is how the images were checked before they were deployed.
 
 Copy each `appsettings.Development.json.example` (in `src/Nythorion.Api` and `src/Nythorion.Auth`) to `appsettings.Development.json`, then fill in:
 
