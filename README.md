@@ -142,7 +142,7 @@ Before rebuilding after months, check what has moved:
 
 - **Models.** The model names and versions are pinned in `infra/modules/openai.bicep`, and the deployment names the app uses are in `appsettings.json` under `AzureOpenAI`. Models get retired: `gpt-4o-mini` was already deprecated during this project. Check `az cognitiveservices model list`, and if you change a deployment name, change both places.
 - **Regions, quota and prices.** Run the availability checks above again.
-- **Images.** The tagged images stay on GHCR unless deleted. If they are gone, run `Build images` again (it has a manual trigger).
+- **Images.** The GHCR packages were deleted after the teardown, and the `Build images` workflow is disabled in this repository so that a push cannot recreate them. To rebuild: `gh workflow enable "Build images"`, then run it from the Actions tab or push a change. A recreated package starts private, so make it public again (see step 2 above).
 - **.NET and Node.** To my knowledge .NET 9 leaves support in November 2026, so consider moving the projects and Dockerfiles to a newer version.
 - **Pinned versions.** The GitHub Actions are pinned to commit SHAs and the Bicep resources to API versions. Both age, so refresh them.
 - **The OIDC subject format** has changed once already. Use the `gh api` command above instead of typing it from memory.
