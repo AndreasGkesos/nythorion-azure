@@ -72,6 +72,28 @@ To remove everything, including the soft-deleted Azure OpenAI account so its nam
 ./infra/down.ps1
 ```
 
+### Setting it up again
+
+After a teardown, the environment can be rebuilt in three steps:
+
+1. **Deploy the infrastructure** with `up.ps1` as above, using the image tags of a commit whose images still exist on GHCR. The Container Apps domain is new every time, so addresses change, but the workflows read them from Azure and need no edits.
+2. **Recreate the GitHub to Azure trust.** The pipeline logs in with OIDC, which needs an app registration, a federated credential and a role on the resource group. The role disappears with the group, so it always has to be created again:
+
+   ```bash
+   az ad app create --display-name nythorion-github-deploy --query appId -o tsv
+   az ad sp create --id <appId>
+   az ad app federated-credential create --id <appId> --parameters credential.json
+   az role assignment create --assignee-object-id <servicePrincipalObjectId> --assignee-principal-type ServicePrincipal \
+     --role Contributor --scope /subscriptions/<subscriptionId>/resourceGroups/rg-nythorion
+   ```
+
+   `credential.json` holds the issuer `https://token.actions.githubusercontent.com`, the audience `api://AzureADTokenExchange`, and the subject. The subject now contains numeric IDs, in the form `repo:<owner>@<ownerId>/<repo>@<repoId>:ref:refs/heads/main`. If it is wrong, the login fails with `AADSTS700213` and the error message prints the exact subject to use.
+
+   Then store the app's client ID, the tenant ID and the subscription ID as the repository secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`. They are identifiers and not credentials.
+3. **Publish the frontend** by running the `deploy-web.yml` workflow from the Actions tab.
+
+A rebuild also needs a subscription where the chosen regions and model quotas are available. On the trial used here, several regions were restricted, and the Postgres, Container Apps and Static Web App locations had to differ for that reason, which is why `main.bicep` takes them as separate parameters.
+
 ---
 
 ## Pipeline
