@@ -105,14 +105,6 @@ The automated tests (75 across unit and integration projects) use fakes for the 
 
 ---
 
-## Lessons from the deployment
-
-- **Trial subscriptions are restricted by region.** West Europe, East US and Germany West Central were unavailable. Postgres, Container Apps and Azure OpenAI each had a different usable region, so the template takes a separate location for Postgres and the Static Web App.
-- **Model availability moves.** `gpt-4o-mini` is deprecated and `gpt-4.1-mini` has no `Standard` quota on the trial, but works as `GlobalStandard`.
-- **Rate limits break bulk jobs.** With the default embedding capacity of 10 (about 10,000 tokens per minute), a book failed with HTTP 429 halfway through. Raising the capacity to 100 fixed it. Capacity is a limit, not a reservation, so it costs nothing extra.
-- **OIDC subject claims changed.** GitHub now includes numeric owner and repository IDs in the subject, so a federated credential written with plain names fails with `AADSTS700213`. The error message contains the exact subject to use.
-- **Model output habits differ.** `gpt-4.1-mini` sometimes started a flashcard answer by repeating the question. A one-line prompt change fixed it, with a safety net in the parser.
-
 ## Known limitations
 
 - Auth signing keys and ASP.NET Data Protection keys are created at startup, so restarting the auth server signs everyone out.
