@@ -35,7 +35,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.sha || github.event.workflow_run.head_sha }}
-          fetch-depth: 2
+          fetch-depth: 0
+
+      # OIDC: GitHub proves who it is to Azure, so no stored password or key exists
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Work out the images
         id: image
@@ -44,19 +51,16 @@ jobs:
         run: |
           echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nythorion-api:${SHA}" >> "$GITHUB_OUTPUT"
           echo "auth_ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/nythorion-auth:${SHA}" >> "$GITHUB_OUTPUT"
-          # Auth keeps its signing keys in memory, so restarting it signs everyone out: only redeploy it when it changed
-          if git diff --quiet HEAD~1 HEAD -- src/Nythorion.Auth; then
+
+          # Auth keeps its signing keys in memory, so restarting it signs everyone out.
+          # Redeploy it only when its code differs from the commit that is running now, however many commits were pushed.
+          current=$(az containerapp show --name "$AUTH_APP" --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[0].image" --output tsv)
+          deployed_sha="${current##*:}"
+          if git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null && git diff --quiet "$deployed_sha" "$SHA" -- src/Nythorion.Auth; then
             echo "auth_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "auth_changed=true" >> "$GITHUB_OUTPUT"
           fi
-
-      # OIDC: GitHub proves who it is to Azure, so no stored password or key exists
-      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Update the API container app
         run: >
