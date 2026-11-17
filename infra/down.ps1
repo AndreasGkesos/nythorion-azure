@@ -9,11 +9,11 @@ param(
     [string] $Location = 'swedencentral'
 )
 
-$ErrorActionPreference = 'Stop'
-
 $accounts = az cognitiveservices account list --resource-group $ResourceGroup --query "[?kind=='OpenAI'].name" --output tsv
+if ($LASTEXITCODE -ne 0) { throw 'Listing the OpenAI accounts failed' }
 
 az group delete --name $ResourceGroup --yes
+if ($LASTEXITCODE -ne 0) { throw 'Deleting the resource group failed' }
 
 foreach ($account in $accounts) {
     az cognitiveservices account purge --name $account --resource-group $ResourceGroup --location $Location

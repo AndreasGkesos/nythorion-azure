@@ -15,7 +15,10 @@ param(
     [switch] $WhatIf
 )
 
-$ErrorActionPreference = 'Stop'
+# Native stderr output (CLI warnings) must not abort the script, so exit codes are checked instead
+function Assert-Success([string] $step) {
+    if ($LASTEXITCODE -ne 0) { throw "$step failed with exit code $LASTEXITCODE" }
+}
 
 function New-RandomPassword {
     $chars = (48..57) + (65..90) + (97..122)
@@ -32,6 +35,7 @@ if (Test-Path $secretsFile) {
 }
 
 az group create --name $ResourceGroup --location $Location --output none
+Assert-Success 'Creating the resource group'
 
 $deployment = @(
     'deployment', 'group', $(if ($WhatIf) { 'what-if' } else { 'create' }),
@@ -48,3 +52,4 @@ $deployment = @(
 )
 
 az @deployment
+Assert-Success 'The deployment'
