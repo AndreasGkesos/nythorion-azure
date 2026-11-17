@@ -10,7 +10,7 @@ The application started as a local project that ran on Ollama. This fork replace
 - **Azure OpenAI** reached through a managed identity, so there is no OpenAI key anywhere
 - **GitHub Actions** that test, build images to GHCR and deploy to Azure through OIDC
 
-> Built for hands-on learning. The environment was deployed, tested and then deleted to stay within the trial credit, so there is no live URL.
+> Built for hands-on learning. The environment was deployed, tested and then deleted to stay within the trial credit, so there is no live URL. The Azure resources, the deploy identity and the GitHub secrets are gone, so the deploy workflows stop at the Azure login until the steps under [Deploying](#deploying) are repeated. The build and test workflow still runs.
 
 ![A follow-up question resolved from the conversation history and answered from the uploaded document](docs/chat.png)
 
